@@ -1,0 +1,122 @@
+<!doctype html>
+<!-- Web Drawing LED Matrix V2.05 (Feb 18, 2023) WiFiBoy Computing Lab -->
+<html>
+
+<head>
+	<script type="text/javascript" src="jquery.min.js"></script>
+	<script type="text/javascript" src="jqColorPicker.min.js"></script>
+	<script type="text/javascript">
+		function getRGB(str) {
+			var match = str.match(/rgba?\((\d{1,3}), ?(\d{1,3}), ?(\d{1,3})\)?(?:, ?(\d(?:\.\d?))\))?/);
+			return "[" + match[1] + "," + match[2] + "," + match[3] + "]";
+		}
+	</script>
+	<style type="text/css">
+		.divTable { display: table; }
+		.divTableRow { display: table-row; }
+		.divTableHeading { background-color: #EEE; display: table-header-group; }
+		.divTableCell,
+		.divTableHead { border: 1px solid #444444; display: table-cell; height: 20px; width: 20px; }
+		.divTableHeading { background-color: #EEE; display: table-header-group; font-weight: bold; }
+		.divTableFoot { background-color: #EEE; display: table-footer-group; font-weight: bold; }
+		.divTableBody { display: table-row-group; }
+		.unselectable {
+			-moz-user-select: -moz-none;
+			-khtml-user-select: none;
+			-webkit-user-select: none;
+			-o-user-select: none;
+			user-select: none;
+		}
+		#createMap { margin-bottom: 20px; }
+	</style>
+	<meta charset="utf-8">
+	<title>Web Drawing LED Panel</title>
+</head>
+
+<body>
+	<b>Color:</b>
+	<input class="color no-alpha" value="rgb(2, 163, 3)" style="background-color: rgb(2, 163, 3); color: rgb(221, 221, 221);">
+	<button id="clearButton">Clear</button>
+	<b>&nbsp;&nbsp;IP Address:</b>
+	<input type="text" id="IP">
+	<button id="connectButton">Connect</button>
+
+	<div class="divTable" style="border: 1px solid #000;">
+		<div class="divTableBody" id="divTableBody"> </div>
+	</div>
+
+	<script type="text/javascript">
+
+		var exampleSocket; // = new WebSocket("ws://192.168.0.114:81"); // ＊＊載入前，請先修改這裡的 IP 地址！＊＊
+
+		var displayWidth = 64;
+		var displayHeight = 32;
+
+		function createGrid(columns, rows) {
+			for (var rowIndex = 0; rowIndex < rows; rowIndex++) {
+				var row = $("<div class='divTableRow' data-ycord='" + rowIndex + "'></div>");
+				row.appendTo('#divTableBody');
+				for (var columnIndex = 0; columnIndex < columns; columnIndex++) {
+					var cellNumber = rowIndex * columns + columnIndex;
+					$("<div class='divTableCell unselectable' id='cell"+ cellNumber +"' style='background-color: rgb(0, 0, 0)' data-xcord='" + columnIndex + "' >&nbsp;</div>").appendTo(row);
+				}
+			}
+		}
+
+		$(document).ready(function() {
+			document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        }, false);
+			createGrid(displayWidth, displayHeight);
+			$(".divTableCell").on("mousedown mouseenter", function(e) {
+				if (e.buttons == 1) {
+					handleCellChange(this, $(".color").val());
+				} else if (e.buttons == 2){
+					handleCellChange(this, "rgb(0, 0, 0)");
+				}
+			});
+		});
+
+		function handleCellChange(element, colourVal) {
+			$(element).css('background-color', colourVal);
+			sendWebsocketMessage(element, colourVal);
+		}
+
+		function sendWebsocketMessage(element, colourVal) {
+			var xCord = $(element).data('xcord');
+			var yCord = $(element).parent().data('ycord');
+			var convertedColour = convertColourToRGB565(colourVal);
+			var message = '0:' 
+			message += xCord + ',';
+			message += yCord + ',';
+			message += '0x' + convertedColour;
+			exampleSocket.send(message);
+		}
+
+		function convertColourToRGB565(colour) {
+			var match = colour.match(/rgba?\((\d{1,3}), ?(\d{1,3}), ?(\d{1,3})\)?(?:, ?(\d(?:\.\d?))\))?/);
+			var colourInt = ((parseInt(match[1]) & 0xF8) << 8) | ((parseInt(match[2]) & 0xFC) << 3) | (parseInt(match[3]) >> 3);
+			var convertedColour = colourInt.toString(16);
+			for (var colourPadIndex = 0; (convertedColour.length + colourPadIndex) < 4; colourPadIndex++){
+				convertedColour = '0' + convertedColour;
+			}
+			return convertedColour.toUpperCase();
+		}
+
+		$("#clearButton").click(function() {
+			exampleSocket.send("CLEAR");
+			$(".divTableCell").css('background-color', "rgb(0, 0, 0)");
+		});
+
+		$("#connectButton").click(function() {
+			console.log("ws://"+document.getElementById("IP").value+":81");
+			exampleSocket = new WebSocket("ws://"+document.getElementById("IP").value+":81");
+			$(".divTableCell").css('background-color', "rgb(0, 0, 0)");
+		});
+
+		$(".color").colorPicker({
+			forceAlpha: false
+		});
+	</script>
+</body>
+</html>
